@@ -11,6 +11,9 @@ import plotly.graph_objs as go
 from igraph import Graph, EdgeSeq
 import numpy as np
 import argparse
+import os
+root = os.getcwd()
+path = 'GAP'
 
 parser = argparse.ArgumentParser(description='Create graph matrix')
 parser.add_argument('--port', default='2345', type=int, help='vis port')
@@ -33,14 +36,19 @@ fig_data = go.Scatter(x=x, y=y, mode='markers')
 
 
 v_label = list(map(str, range(args.nodes_number)))
-G = Graph(1)
-G.add_vertex(args.nodes_number)
+G = Graph()
+G.add_vertices(args.nodes_number)
 lay = G.layout('rt')
 position = {k: [xi, yi] for k, xi, yi in zip(range(args.nodes_number), x, y)}
 labels = v_label
 
 # table
 table_size = args.nodes_number
+
+matrix = np.zeros((table_size, table_size))
+Xe = []
+Ye = []
+
 
 
 ## header
@@ -90,18 +98,26 @@ Body = html.Div([
         dcc.Graph(id='Table'),
     ], style=dict(width='45%', display='inline-block')),
 ])
-
 app.layout = html.Div([
     header,
     Body,
 ])
+
 def udate_table(table, idxlist, matrix):
 
     matrix[idxlist[0], idxlist[1]] = 1
     matrix[idxlist[1], idxlist[0]] = 1
+    header_value = ['satrts']
+
+    cells_value = []
+    cells_value.append([i for i in labels])
+    for i in labels:
+        cells_value.append(list(matrix[int(i)]))
+        header_value.append(i)
+
     table.add_trace(go.Table(
         header=dict(
-            values=[i for i in labels],
+            values=header_value,
             line_color='darkslategray',
             fill_color='royalblue',
             align='center',
@@ -109,7 +125,8 @@ def udate_table(table, idxlist, matrix):
             height=40
         ),
         cells=dict(
-            values=[[i for i in labels], matrix],
+            # values=[[i for i in labels], ] ,
+            values=cells_value,
             line_color='darkslategray',
             fill=dict(color=['royalblue', 'white']),
             align='center',
@@ -126,7 +143,7 @@ def udate_table(table, idxlist, matrix):
 
 def update_graph(G, graph_fig, idxlist, posx, posy, Xe, Ye):
 
-    G.add_edges((idxlist[0], idxlist[1]))
+    # G.add_edges((idxlist[0], idxlist[1]))
     Xe += [posx[0], posx[1], None]
     Ye += [posy[0], posy[1], None]
     # labels = v_label
@@ -192,61 +209,48 @@ def update_graph(G, graph_fig, idxlist, posx, posy, Xe, Ye):
      ],
     [dash.dependencies.Input('Mouse_model', 'value'),
      dash.dependencies.Input('save_table', 'n_clicks'),
-     dash.dependencies.Input('Figure', 'clickData'),
+     dash.dependencies.Input('Figure', 'selectedData'),
      dash.dependencies.Input('clear_graph', 'n_clicks'),
     ]
 )
-def update_create_canvas(mouse_model, save_click, figure_click, clear_click):
+
+def update_callback(mouse_model, save_click, selecteddata, clear_click):
     fig = go.FigureWidget([fig_data])
-    matrix = np.zeros((table_size, table_size))
-    maxpoints = 2
-    idxlist = []
-    Xe = []
-    Ye = []
-    posx = []
-    posy = []
+
+    tab_fig = go.Figure()
+    graph_fig = go.Figure()
+    # params
 
     if mouse_model == "Line":
-        if figure_click is None:
+        if selecteddata is None:
             graph_fig = go.Figure(go.Scatter(x=[0, 0], y=[0, 0]))
             tab_fig = go.Figure(go.Scatter(x=[0, 0], y=[0, 0]))
         else:
-            tab_fig = go.Figure()
-            graph_fig = go.Figure()
+            if len(selecteddata['points']) != 2:
+                raise IOError('Input points  must be equal to 2')
+            else:
+                points = selecteddata['points']
+                idx1 = int(points[0]['pointIndex'])
+                idx2 = int(points[1]['pointIndex'])
+                # position1 = (points[0]['x'], points[0]['y'])
+                # position2 = (points[1]['x'], points[1]['y'])
+                idxlist = [idx1, idx2]
+                posx = [points[0]['x'], points[1]['x']]
+                posy = [points[0]['y'], points[1]['y']]
 
-            maxpoints -= 1
-            print("maxpoints", maxpoints)
-            idx = int(figure_click['points'][0]['pointIndex'])
-            xi = figure_click['points'][0]['x']
-            yi = figure_click['points'][0]['y']
-            idxlist.append(idx)
-            print("idxlist:", idxlist)
-            posx.append(xi)
-            posy.append(yi)
-            if maxpoints == 0:
                 # updated table
                 tab_fig = udate_table(tab_fig, idxlist, matrix)
 
                 # updated graph
                 graph_fig = update_graph(G, graph_fig, idxlist, posx, posy, Xe, Ye)
 
-                # clear points
-                maxpoints = 2
-                idxlist = []
-                Xe = []
-                Ye = []
-                posx = []
-                posy = []
-
-
-
-
-
     if save_click:
         ##save np
-        pass
+        file = os.path.join(root, path, 'matrix.npy')
+        print("saving matirx")
+        np.save(file, matrix)
+
     if clear_click:
-        fig = go.Figure(go.Scatter(x=[0, 0], y=[0, 0]))
         graph_fig = go.Figure(go.Scatter(x=[0, 0], y=[0, 0]))
         tab_fig = go.Figure(go.Table())
 
@@ -254,6 +258,6 @@ def update_create_canvas(mouse_model, save_click, figure_click, clear_click):
     return [fig, graph_fig, tab_fig]
 
 if __name__ == "__main__":
-    app.run_server(debug=True)
-    # app.run_server(host='localhost', port=args.port, debug=False)
+    # app.run_server(debug=True)
+    app.run_server(host='localhost', port=args.port, debug=False)
 
