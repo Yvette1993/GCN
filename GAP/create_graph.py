@@ -65,7 +65,9 @@ Body = html.Div([
             """
 + 0) Please choose Canvas Size.
 + 1) Getting the node by your mouse.
-+ 2) Connect the corresponding points with the mouse.
++ 2) Choose the corresponding points with the mouse function.
++ 3) Saving matrix to .npy file by click 'save_table' button.
++ 4) Clearing graph and table by click 'Clear_Graph' button.  
             """
         ))
     ]),
